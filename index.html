@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI活用診断</title>
+<meta name="description" content="5つの質問でAI活用レベルがわかる無料診断。会員登録で個人・法人向けの詳細レポートを作成します。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: { ink: '#14213D', paper: '#F3F6F9', brand: '#2F5BEA', brandDark: '#2249C9', amber: '#F2B705', line: '#DCE3EC', muted: '#5B6B82' },
+        fontFamily: { sans: ['"Zen Kaku Gothic New"', 'system-ui', 'sans-serif'] }
+      }
+    }
+  };
+</script>
+<style>
+  body { font-feature-settings: "palt"; -webkit-text-size-adjust: 100%; }
+  [hidden] { display: none !important; }
+  :focus-visible { outline: 3px solid #F2B705; outline-offset: 2px; }
+  .needle { transform-origin: 120px 120px; transform: rotate(-90deg); transition: transform 1.4s cubic-bezier(.2,.8,.2,1); }
+  .spin { animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .needle { transition: none; } .spin { animation: none; } }
+  @media print { header, .no-print { display: none !important; } body { background: #fff; } }
+</style>
+</head>
+<body class="bg-paper text-ink font-sans antialiased min-h-screen flex flex-col">
+
+<header class="bg-white border-b border-line sticky top-0 z-30">
+  <div class="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between gap-3">
+    <button id="logo" class="flex items-center gap-2 font-black text-lg tracking-tight">
+      <svg width="28" height="18" viewBox="0 0 28 18" aria-hidden="true"><path d="M2 16a12 12 0 0 1 24 0" fill="none" stroke="#2F5BEA" stroke-width="3" stroke-linecap="round"/><line x1="14" y1="16" x2="21" y2="7" stroke="#14213D" stroke-width="2.5" stroke-linecap="round"/><circle cx="14" cy="16" r="2" fill="#F2B705"/></svg>
+      AI活用診断
+    </button>
+    <nav id="nav" class="flex items-center gap-2 text-sm"></nav>
+  </div>
+</header>
+
+<main class="flex-1 w-full max-w-5xl mx-auto px-4 py-8">
+
+  <!-- トップ -->
+  <section data-view="home">
+    <div class="grid md:grid-cols-[1.1fr_1fr] gap-8 items-center">
+      <div>
+        <h1 class="text-3xl md:text-5xl font-black leading-tight">AIを、どこまで<br>使えていますか。</h1>
+        <p class="mt-5 text-lg leading-relaxed text-muted max-w-md">5つの質問に答えると、いまのAI活用レベルと、今日から試せる最初の一歩がわかります。登録はいりません。</p>
+        <div class="mt-7 flex flex-col sm:flex-row gap-3">
+          <button data-action="start-quick" class="bg-brand hover:bg-brandDark text-white font-bold rounded-lg px-6 py-4 text-lg">登録なしで簡易診断する</button>
+          <button data-action="start-full" class="border-2 border-ink/15 hover:border-brand bg-white font-bold rounded-lg px-6 py-4 text-lg">本診断を受ける</button>
+        </div>
+        <p class="mt-3 text-sm text-muted">簡易診断は約1分です。</p>
+      </div>
+      <div class="bg-white rounded-2xl border border-line p-6">
+        <div id="hero-gauge"></div>
+        <p class="text-center text-sm text-muted mt-1">診断結果はこのメーターで表示されます</p>
+      </div>
+    </div>
+
+    <div class="mt-14 grid md:grid-cols-2 gap-px bg-line rounded-2xl overflow-hidden border border-line">
+      <div class="bg-white p-6">
+        <h2 class="text-xl font-bold">簡易診断</h2>
+        <p class="text-sm text-muted mt-1">登録不要／5問</p>
+        <p class="mt-3 leading-relaxed">AI活用レベル（初級・中級・上級）の判定と、あなたに合ったおすすめの使い方を1つ提案します。</p>
+      </div>
+      <div class="bg-white p-6">
+        <h2 class="text-xl font-bold">本診断</h2>
+        <p class="text-sm text-muted mt-1">無料会員／個人向け・法人向け（会社規模別）／6〜8問</p>
+        <p class="mt-3 leading-relaxed">効果と費用の見込み、推奨AIツール、導入ステップ、セキュリティの注意点をまとめたレポートを作成します。PDFでメール受け取りもできます。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 設問 -->
+  <section data-view="quiz" class="max-w-2xl mx-auto">
+    <div class="flex items-center justify-between text-sm text-muted">
+      <span id="quiz-title"></span>
+      <span id="quiz-count"></span>
+    </div>
+    <div class="h-2 bg-line rounded-full mt-2 overflow-hidden"><div id="quiz-bar" class="h-full bg-brand transition-all duration-300" style="width:0%"></div></div>
+    <div id="quiz-body" class="mt-8"></div>
+    <div class="mt-8 flex justify-between gap-3">
+      <button id="quiz-back" class="px-5 py-3 rounded-lg border border-ink/15 bg-white font-bold">戻る</button>
+      <button id="quiz-next" class="px-6 py-3 rounded-lg bg-brand hover:bg-brandDark text-white font-bold">次へ</button>
+    </div>
+  </section>
+
+  <!-- 診断中 -->
+  <section data-view="loading" class="max-w-md mx-auto text-center py-16">
+    <svg class="spin mx-auto" width="48" height="48" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="20" fill="none" stroke="#DCE3EC" stroke-width="5"/><path d="M24 4a20 20 0 0 1 20 20" fill="none" stroke="#2F5BEA" stroke-width="5" stroke-linecap="round"/></svg>
+    <p class="mt-6 text-xl font-bold">回答をもとに診断しています</p>
+    <p id="loading-sub" class="mt-2 text-muted">本診断は30秒ほどかかります。画面を閉じずにお待ちください。</p>
+  </section>
+
+  <!-- 簡易診断結果 -->
+  <section data-view="quick-result" class="max-w-3xl mx-auto">
+    <div id="quick-body"></div>
+  </section>
+
+  <!-- 本診断レポート -->
+  <section data-view="report" class="max-w-3xl mx-auto">
+    <div id="report-body"></div>
+    <div class="no-print mt-10 flex flex-col sm:flex-row gap-3">
+      <button id="btn-email-report" class="bg-brand hover:bg-brandDark text-white font-bold rounded-lg px-6 py-3">PDFをメールで受け取る</button>
+      <button onclick="window.print()" class="border border-ink/15 bg-white font-bold rounded-lg px-6 py-3">印刷する</button>
+      <button data-go="dash" class="border border-ink/15 bg-white font-bold rounded-lg px-6 py-3">マイページへ戻る</button>
+    </div>
+  </section>
+
+  <!-- ログイン -->
+  <section data-view="login" class="max-w-md mx-auto">
+    <h1 class="text-2xl font-black">ログイン</h1>
+    <p id="login-note" class="mt-2 text-muted text-sm"></p>
+    <form id="form-login" class="mt-6 space-y-4 bg-white border border-line rounded-2xl p-6" novalidate>
+      <label class="block"><span class="text-sm font-bold">メールアドレス</span>
+        <input name="email" type="email" autocomplete="email" required class="mt-1 w-full rounded-lg border border-line px-4 py-3 text-base focus:border-brand focus:outline-none"></label>
+      <label class="block"><span class="text-sm font-bold">パスワード（初回は仮パスワード）</span>
+        <div class="pw-wrap relative mt-1">
+          <input name="password" type="password" autocomplete="current-password" required class="w-full rounded-lg border border-line px-4 py-3 pr-12 text-base focus:border-brand focus:outline-none">
+          <button type="button" class="pw-eye absolute right-1 top-1/2 -translate-y-1/2 p-2 text-muted hover:text-ink"></button>
+        </div></label>
+      <button class="w-full bg-brand hover:bg-brandDark text-white font-bold rounded-lg py-3 text-lg">ログイン</button>
+      <div class="flex justify-between text-sm pt-1">
+        <button type="button" data-go="forgot" class="text-brand underline underline-offset-4">パスワードを忘れた方</button>
+        <button type="button" data-go="register" class="text-brand underline underline-offset-4">無料会員登録</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- 会員登録 -->
+  <section data-view="register" class="max-w-md mx-auto">
+    <h1 class="text-2xl font-black">無料会員登録</h1>
+    <p class="mt-2 text-muted text-sm">登録したメールアドレスに仮パスワードが届きます。初回ログイン時に新しいパスワードを設定してください。</p>
+    <form id="form-register" class="mt-6 space-y-4 bg-white border border-line rounded-2xl p-6" novalidate>
+      <fieldset>
+        <legend class="text-sm font-bold">ご利用区分</legend>
+        <div class="mt-2 grid grid-cols-2 gap-2">
+          <label class="cursor-pointer"><input type="radio" name="attribute" value="個人" checked class="peer sr-only">
+            <span class="block text-center rounded-lg border-2 border-line py-3 font-bold peer-checked:border-brand peer-checked:bg-brand/5 peer-focus-visible:ring-2 peer-focus-visible:ring-amber">個人</span></label>
+          <label class="cursor-pointer"><input type="radio" name="attribute" value="法人" class="peer sr-only">
+            <span class="block text-center rounded-lg border-2 border-line py-3 font-bold peer-checked:border-brand peer-checked:bg-brand/5 peer-focus-visible:ring-2 peer-focus-visible:ring-amber">法人</span></label>
+        </div>
+      </fieldset>
+      <label class="block"><span class="text-sm font-bold">氏名</span>
+        <input name="name" type="text" autocomplete="name" maxlength="50" required class="mt-1 w-full rounded-lg border border-line px-4 py-3 text-base focus:border-brand focus:outline-none"></label>
+      <div id="corp-fields" hidden class="space-y-4">
+        <label class="block"><span class="text-sm font-bold">会社名</span>
+          <input name="companyName" type="text" autocomplete="organization" maxlength="100" class="mt-1 w-full rounded-lg border border-line px-4 py-3 text-base focus:border-brand focus:outline-none"></label>
+        <label class="block"><span class="text-sm font-bold">会社規模（従業員数）</span>
+          <select name="companySize" class="mt-1 w-full rounded-lg border border-line px-4 py-3 text-base bg-white focus:border-brand focus:outline-none">
+            <option value="">選択してください</option>
+            <option value="小規模">小規模（1〜20名）</option>
+            <option value="中規模">中規模（21〜100名）</option>
+            <option value="大規模">大規模（101名以上）</option>
+          </select></label>
+      </div>
+      <label class="block"><span class="text-sm font-bold">メールアドレス</span>
+        <input name="email" type="email" autocomplete="email" required class="mt-1 w-full rounded-lg border border-line px-4 py-3 text-base focus:border-brand focus:outline-none"></label>
+      <button class="w-full bg-brand hover:bg-brandDark text-white font-bold rounded-lg py-3 text-lg">仮パスワードを受け取る</button>
+      <p class="text-sm text-center">登録済みの方は <button type="button" data-go="login" class="text-brand underline underline-offset-4">ログイン</button></p>
+    </form>
+  </section>
+
+  <!-- パスワード再発行 -->
+  <section data-view="forgot" class="max-w-md mx-auto">
+    <h1 class="text-2xl font-black">パスワードの再発行</h1>
+    <p class="mt-2 text-muted text-sm">登録したメールアドレスに新しい仮パスワードを送ります。これまでのパスワードは使えなくなります。</p>
+    <form id="form-forgot" class="mt-6 space-y-4 bg-white border border-line rounded-2xl p-6" novalidate>
+      <label class="block"><span class="text-sm font-bold">メールアドレス</span>
+        <input name="email" type="email" autocomplete="email" required class="mt-1 w-full rounded-lg border border-line px-4 py-3 text-base focus:border-brand focus:outline-none"></label>
+      <button class="w-full bg-brand hover:bg-brandDark text-white font-bold rounded-lg py-3 text-lg">仮パスワードを再発行する</button>
+      <p class="text-sm text-center"><button type="button" data-go="login" class="text-brand underline underline-offset-4">ログインに戻る</button></p>
+    </form>
+  </section>
+
+  <!-- パスワード変更 -->
+  <section data-view="change-pw" class="max-w-md mx-auto">
+    <h1 class="text-2xl font-black">パスワードの設定</h1>
+    <p id="change-note" class="mt-2 text-muted text-sm"></p>
+    <form id="form-change" class="mt-6 space-y-4 bg-white border border-line rounded-2xl p-6" novalidate>
+      <label class="block"><span id="cur-label" class="text-sm font-bold">現在のパスワード</span>
+        <div class="pw-wrap relative mt-1">
+          <input name="currentPassword" type="password" autocomplete="current-password" required class="w-full rounded-lg border border-line px-4 py-3 pr-12 text-base focus:border-brand focus:outline-none">
+          <button type="button" class="pw-eye absolute right-1 top-1/2 -translate-y-1/2 p-2 text-muted hover:text-ink"></button>
+        </div></label>
+      <label class="block"><span class="text-sm font-bold">新しいパスワード</span>
+        <div class="pw-wrap relative mt-1">
+          <input name="newPassword" type="password" autocomplete="new-password" required class="w-full rounded-lg border border-line px-4 py-3 pr-12 text-base focus:border-brand focus:outline-none">
+          <button type="button" class="pw-eye absolute right-1 top-1/2 -translate-y-1/2 p-2 text-muted hover:text-ink"></button>
+        </div>
+        <span class="block mt-1 text-xs text-muted">8文字以上で、英字と数字を両方含めてください</span></label>
+      <label class="block"><span class="text-sm font-bold">新しいパスワード（確認）</span>
+        <div class="pw-wrap relative mt-1">
+          <input name="confirmPassword" type="password" autocomplete="new-password" required class="w-full rounded-lg border border-line px-4 py-3 pr-12 text-base focus:border-brand focus:outline-none">
+          <button type="button" class="pw-eye absolute right-1 top-1/2 -translate-y-1/2 p-2 text-muted hover:text-ink"></button>
+        </div></label>
+      <button class="w-full bg-brand hover:bg-brandDark text-white font-bold rounded-lg py-3 text-lg">パスワードを設定する</button>
+      <p id="change-cancel" class="text-sm text-center"><button type="button" data-go="dash" class="text-brand underline underline-offset-4">マイページに戻る</button></p>
+    </form>
+  </section>
+
+  <!-- マイページ -->
+  <section data-view="dash">
+    <h1 class="text-2xl md:text-3xl font-black" id="dash-hello"></h1>
+    <p class="mt-2 text-muted">診断の種類を選んでください。回答は6〜8問です。</p>
+
+    <div class="mt-6 grid md:grid-cols-2 gap-4">
+      <div class="bg-white border border-line rounded-2xl p-6 flex flex-col">
+        <h2 class="text-xl font-bold">個人向け診断</h2>
+        <p class="mt-2 text-muted leading-relaxed flex-1">業務効率化、自己学習、副業・フリーランスなど、目的に合わせて活用法を提案します。</p>
+        <button data-full="個人" class="mt-5 bg-brand hover:bg-brandDark text-white font-bold rounded-lg py-3">個人向け診断を始める</button>
+      </div>
+      <div class="bg-white border border-line rounded-2xl p-6 flex flex-col">
+        <h2 class="text-xl font-bold">法人向け診断</h2>
+        <p class="mt-2 text-muted leading-relaxed">会社の規模によって質問と提案の内容が変わります。</p>
+        <div class="mt-4 grid gap-2" id="size-buttons">
+          <button data-full="法人_小規模" class="text-left rounded-lg border-2 border-line hover:border-brand px-4 py-3"><b>小規模</b><span class="text-sm text-muted ml-2">1〜20名</span></button>
+          <button data-full="法人_中規模" class="text-left rounded-lg border-2 border-line hover:border-brand px-4 py-3"><b>中規模</b><span class="text-sm text-muted ml-2">21〜100名</span></button>
+          <button data-full="法人_大規模" class="text-left rounded-lg border-2 border-line hover:border-brand px-4 py-3"><b>大規模</b><span class="text-sm text-muted ml-2">101名以上</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="mt-10">
+      <div class="flex items-end justify-between">
+        <h2 class="text-xl font-bold">これまでの診断</h2>
+        <button data-go="change-pw" class="text-sm text-brand underline underline-offset-4">パスワードを変更</button>
+      </div>
+      <div id="history" class="mt-3 bg-white border border-line rounded-2xl divide-y divide-line"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="text-center text-xs text-muted py-6">診断結果はAIによる目安です。料金や機能は導入前に各サービスの最新情報をご確認ください。</footer>
+
+<div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-6 z-50 max-w-[92vw] px-5 py-3 rounded-lg text-white font-bold shadow-lg" role="status" aria-live="polite" hidden></div>
+
+<!-- GASのURLは config.js で設定（index.html を更新しても書き換え不要） -->
+<script src="config.js"></script>
+<script>
+const GAS_URL = (window.APP_CONFIG && window.APP_CONFIG.GAS_URL) || '';
+
+const TOKEN_KEY = 'aiShindanToken';
+const state = { token: localStorage.getItem(TOKEN_KEY) || '', user: null, quiz: null, report: null, afterLogin: 'dash' };
+
+const TYPE_LABEL = {
+  '簡易': '簡易診断',
+  '個人': '個人向け診断',
+  '法人_小規模': '法人向け診断（小規模：1〜20名）',
+  '法人_中規模': '法人向け診断（中規模：21〜100名）',
+  '法人_大規模': '法人向け診断（大規模：101名以上）'
+};
+
+/* ---------- 設問 ---------- */
+const FREQ = ['ほぼ毎日', '週に数回', '月に数回', '使ったことがない'];
+const QUICK = [
+  { id: 'freq', text: 'ChatGPT・Gemini・Claudeなどの生成AIを、どのくらい使っていますか？', type: 'single', options: FREQ },
+  { id: 'use', text: '主にどんなことに使っていますか？', type: 'multi', options: ['文章の作成・要約', '調べもの', '企画・アイデア出し', 'プログラミング', '画像・動画の作成', 'まだ使っていない'] },
+  { id: 'check', text: 'AIの回答をどのように扱っていますか？', type: 'single', options: ['事実や出典を確認してから使う', 'だいたいそのまま使う', '使い方がよくわからない'] },
+  { id: 'prompt', text: 'AIへの指示（プロンプト）で工夫していることは？', type: 'single', options: ['役割・条件・出力の形まで指定する', '簡単な質問文を入れる程度', '特に工夫したことはない'] },
+  { id: 'goal', text: 'AIで一番解決したいことは何ですか？', type: 'single', options: ['仕事の時短', 'スキルアップ・学習', '副業・収入づくり', '情報収集', 'まだ決まっていない'] }
+];
+const PERSONAL = [
+  { id: 'purpose', text: 'AIを使う主な目的を選んでください', type: 'single', options: ['業務効率化', '自己学習・スキルアップ', '副業・フリーランス'] },
+  { id: 'job', text: 'あなたの職種・立場に近いものは？', type: 'single', options: ['会社員（事務・管理）', '会社員（営業・企画）', '技術職・エンジニア', '自営業・フリーランス', '学生', 'その他'] },
+  { id: 'freq', text: '生成AIをどのくらい使っていますか？', type: 'single', options: FREQ },
+  { id: 'tools', text: '使ったことのあるツールは？', type: 'multi', options: ['ChatGPT', 'Gemini', 'Claude', 'Microsoft Copilot', '画像生成AI', '特になし'] },
+  { id: 'tasks', text: '毎週くり返している作業は？', type: 'multi', options: ['メール・文書の作成', '資料・スライドの作成', 'データの集計・表計算', '情報収集・リサーチ', 'SNS・ブログでの発信', 'プログラミング'] },
+  { id: 'budget', text: 'AIツールに毎月かけられる費用は？', type: 'single', options: ['無料の範囲で', '月3,000円程度', '月1万円程度', 'それ以上でもよい'] },
+  { id: 'free', text: 'AIについて気になっていること、困っていること（任意）', type: 'text', optional: true, placeholder: '例：会議の議事録づくりに毎回1時間かかっている' }
+];
+const CORP_COMMON = [
+  { id: 'industry', text: '業種を選んでください', type: 'single', options: ['製造', '小売・飲食', 'IT・通信', '医療・介護・福祉', '建設・不動産', '士業・コンサルティング', 'その他サービス'] },
+  { id: 'status', text: '社内でのAIの利用状況は？', type: 'single', options: ['会社として導入済み', '一部の社員が個人的に使っている', 'ほとんど使っていない', '利用を禁止している'] },
+  { id: 'pain', text: '時間がかかっている業務は？', type: 'multi', options: ['問い合わせ・顧客対応', '書類・報告書の作成', 'データ入力・集計', '会議・議事録', '採用・社員教育', '営業・マーケティング'] },
+  { id: 'budget', text: 'AI導入にかけられる年間予算は？', type: 'single', options: ['10万円未満', '10〜100万円', '100〜1,000万円', '1,000万円以上', '未定'] }
+];
+const FREE_CORP = { id: 'free', text: 'AIで解決したい課題や懸念（任意）', type: 'text', optional: true, placeholder: '例：問い合わせ対応を省力化したいが、顧客情報の扱いが心配' };
+const CORP_EXTRA = {
+  '小規模': [
+    { id: 'it', text: 'ITやパソコン周りは誰が担当していますか？', type: 'single', options: ['専任はいない（社長・社員が兼任）', '兼任の担当者がいる', '外部の業者に頼んでいる'] },
+    FREE_CORP
+  ],
+  '中規模': [
+    { id: 'rule', text: 'AI利用のルール（ガイドライン）はありますか？', type: 'single', options: ['ある', '作成中', 'ない'] },
+    { id: 'owner', text: 'AI導入を進める部門は？', type: 'single', options: ['経営企画・DX推進', '情報システム部門', '各部門に任せている', '決まっていない'] },
+    FREE_CORP
+  ],
+  '大規模': [
+    { id: 'gov', text: 'AI利用のガバナンス（ルールや承認の仕組み）は？', type: 'single', options: ['ガイドラインと承認フローがある', 'ガイドラインのみある', 'まだない'] },
+    { id: 'systems', text: '連携を考えたい既存システムは？', type: 'multi', options: ['基幹システム（ERP）', '顧客管理・営業支援（CRM・SFA）', 'グループウェア（Microsoft 365・Google Workspace）', '自社独自の業務システム', '特になし'] },
+    { id: 'team', text: '全社でAIを推進する体制は？', type: 'single', options: ['部門横断の専任チームがある', '部門ごとに推進している', 'まだ整っていない'] },
+    FREE_CORP
+  ]
+};
+function questionsFor(type) {
+  if (type === '簡易') return QUICK;
+  if (type === '個人') return PERSONAL;
+  return CORP_COMMON.concat(CORP_EXTRA[type.split('_')[1]]);
+}
+
+/* ---------- 共通 ---------- */
+const $ = (s) => document.querySelector(s);
+const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmtDate = (iso) => new Date(iso).toLocaleString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+
+async function api(action, data = {}) {
+  try {
+    const res = await fetch(GAS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(Object.assign({ action, token: state.token }, data))
+    });
+    const json = await res.json();
+    if (!json.ok && json.code === 'AUTH' && action !== 'login') clearSession();
+    return json;
+  } catch (e) {
+    return { ok: false, code: 'NETWORK', error: '通信できませんでした。インターネット接続を確認してもう一度お試しください' };
+  }
+}
+
+function saveSession(token, user) {
+  state.token = token; state.user = user;
+  localStorage.setItem(TOKEN_KEY, token);
+}
+function clearSession() {
+  state.token = ''; state.user = null;
+  localStorage.removeItem(TOKEN_KEY);
+  renderHeader();
+}
+
+let toastTimer;
+function toast(msg, type = 'info') {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.className = t.className.replace(/bg-\S+/g, '') + (type === 'error' ? ' bg-red-600' : ' bg-ink');
+  t.hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (t.hidden = true), type === 'error' ? 6000 : 4000);
+}
+
+function busy(btn, on, text) {
+  if (!btn) return;
+  if (on) { btn.dataset.label = btn.textContent; btn.textContent = text || '処理中…'; btn.disabled = true; btn.classList.add('opacity-60'); }
+  else { btn.textContent = btn.dataset.label || btn.textContent; btn.disabled = false; btn.classList.remove('opacity-60'); }
+}
+
+function show(view) {
+  document.querySelectorAll('[data-view]').forEach((v) => (v.hidden = v.dataset.view !== view));
+  window.scrollTo(0, 0);
+  renderHeader();
+}
+
+function go(view) {
+  const u = state.user;
+  if ((view === 'dash' || view === 'change-pw') && !u) { state.afterLogin = view; return go('login'); }
+  if (view === 'dash' && u.mustChangePassword) return go('change-pw');
+  if (view === 'dash') loadDash();
+  if (view === 'change-pw') prepareChangePw();
+  if (view === 'login') $('#login-note').textContent = state.afterLogin === 'dash' ? '本診断はログイン後にご利用いただけます。' : '';
+  show(view);
+}
+
+function renderHeader() {
+  const u = state.user;
+  const btn = 'px-3 py-2 rounded-lg font-bold';
+  if (u && !u.mustChangePassword) {
+    $('#nav').innerHTML = `<button data-go="dash" class="${btn} hover:bg-paper">マイページ</button><button data-action="logout" class="${btn} hover:bg-paper text-muted">ログアウト</button>`;
+  } else if (u) {
+    $('#nav').innerHTML = `<button data-action="logout" class="${btn} hover:bg-paper text-muted">ログアウト</button>`;
+  } else {
+    $('#nav').innerHTML = `<button data-go="login" class="${btn} hover:bg-paper">ログイン</button><button data-go="register" class="${btn} bg-brand text-white hover:bg-brandDark">無料登録</button>`;
+  }
+}
+
+/* ---------- メーター ---------- */
+function polar(deg, r) { const a = (deg * Math.PI) / 180; return [120 + r * Math.cos(a), 120 - r * Math.sin(a)]; }
+function arc(fromPct, toPct, r) {
+  const [x1, y1] = polar(180 - fromPct * 180, r), [x2, y2] = polar(180 - toPct * 180, r);
+  return `M${x1.toFixed(1)} ${y1.toFixed(1)} A${r} ${r} 0 0 1 ${x2.toFixed(1)} ${y2.toFixed(1)}`;
+}
+function gauge(score, level, compact) {
+  const deg = (Math.max(0, Math.min(100, score)) / 100) * 180 - 90;
+  const seg = [[0, 0.395, '#C9D6FF', '初級'], [0.405, 0.745, '#7E9BF7', '中級'], [0.755, 1, '#2F5BEA', '上級']];
+  const labels = seg.map(([a, b, , t]) => {
+    const [x, y] = polar(180 - ((a + b) / 2) * 180, 72);
+    const active = t === level;
+    return `<text x="${x.toFixed(1)}" y="${(y + 5).toFixed(1)}" text-anchor="middle" font-size="13" font-weight="${active ? 900 : 500}" fill="${active ? '#14213D' : '#5B6B82'}">${t}</text>`;
+  }).join('');
+  return `<svg viewBox="0 0 240 140" class="w-full ${compact ? 'max-w-[220px]' : 'max-w-[340px]'} mx-auto" role="img" aria-label="AI活用レベル ${esc(level)}、${score}点">
+    ${seg.map(([a, b, c]) => `<path d="${arc(a, b, 100)}" fill="none" stroke="${c}" stroke-width="20"/>`).join('')}
+    ${labels}
+    <g class="needle" data-deg="${deg}"><line x1="120" y1="120" x2="120" y2="30" stroke="#14213D" stroke-width="4" stroke-linecap="round"/></g>
+    <circle cx="120" cy="120" r="9" fill="#F2B705" stroke="#14213D" stroke-width="3"/>
+  </svg>`;
+}
+function animateGauges(root = document) {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    root.querySelectorAll('.needle').forEach((n) => (n.style.transform = `rotate(${n.dataset.deg}deg)`));
+  }));
+}
+
+/* ---------- 設問の進行 ---------- */
+function startQuiz(type) {
+  state.quiz = { type, qs: questionsFor(type), idx: 0, answers: {} };
+  $('#quiz-title').textContent = TYPE_LABEL[type];
+  show('quiz');
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const { qs, idx, answers } = state.quiz;
+  const q = qs[idx];
+  const val = answers[q.id];
+  $('#quiz-count').textContent = `${idx + 1} / ${qs.length}`;
+  $('#quiz-bar').style.width = `${(idx / qs.length) * 100}%`;
+  let html = `<h2 class="text-xl md:text-2xl font-bold leading-snug">${esc(q.text)}</h2>`;
+  if (q.type === 'multi') html += `<p class="mt-1 text-sm text-muted">あてはまるものをすべて選んでください</p>`;
+  if (q.type === 'text') {
+    html += `<textarea id="q-text" rows="4" maxlength="400" placeholder="${esc(q.placeholder || '')}" class="mt-5 w-full rounded-lg border border-line px-4 py-3 text-base focus:border-brand focus:outline-none">${esc(val || '')}</textarea>`;
+  } else {
+    const inputType = q.type === 'multi' ? 'checkbox' : 'radio';
+    html += `<div class="mt-5 grid gap-2">` + q.options.map((o) => {
+      const checked = q.type === 'multi' ? (val || []).includes(o) : val === o;
+      return `<label class="cursor-pointer"><input type="${inputType}" name="opt" value="${esc(o)}" ${checked ? 'checked' : ''} class="peer sr-only">
+        <span class="flex items-center gap-3 rounded-xl border-2 border-line bg-white px-4 py-4 text-base md:text-lg peer-checked:border-brand peer-checked:bg-brand/5 peer-focus-visible:ring-2 peer-focus-visible:ring-amber">
+          <span class="shrink-0 w-5 h-5 ${inputType === 'radio' ? 'rounded-full' : 'rounded'} border-2 border-muted"></span>${esc(o)}</span></label>`;
+    }).join('') + `</div>`;
+  }
+  $('#quiz-body').innerHTML = html;
+  // 選択状態のマーカー表示
+  $('#quiz-body').querySelectorAll('input[name="opt"]').forEach(syncMark);
+  $('#quiz-back').textContent = idx === 0 ? 'やめる' : '戻る';
+  $('#quiz-next').textContent = idx === qs.length - 1 ? '診断する' : '次へ';
+}
+function syncMark(input) {
+  const mark = input.nextElementSibling.firstElementChild;
+  mark.style.background = input.checked ? '#2F5BEA' : '';
+  mark.style.borderColor = input.checked ? '#2F5BEA' : '';
+  mark.style.boxShadow = input.checked ? 'inset 0 0 0 3px #fff' : '';
+}
+
+function collectAnswer() {
+  const { qs, idx, answers } = state.quiz;
+  const q = qs[idx];
+  if (q.type === 'text') { answers[q.id] = $('#q-text').value.trim(); return true; }
+  const checked = [...document.querySelectorAll('input[name="opt"]:checked')].map((i) => i.value);
+  if (!checked.length) { toast('選択肢を選んでください', 'error'); return false; }
+  answers[q.id] = q.type === 'multi' ? checked : checked[0];
+  return true;
+}
+
+async function submitQuiz() {
+  const { type, qs, answers } = state.quiz;
+  const payload = qs.map((q) => {
+    const v = answers[q.id];
+    return { q: q.text, a: Array.isArray(v) ? v.join('、') : (v || '（未回答）') };
+  });
+  $('#loading-sub').textContent = type === '簡易' ? '10〜20秒ほどかかります。' : '30秒ほどかかります。画面を閉じずにお待ちください。';
+  show('loading');
+  const r = await api(type === '簡易' ? 'quickDiagnose' : 'fullDiagnose', { type, answers: payload });
+  if (!r.ok) {
+    toast(r.error, 'error');
+    if (r.code === 'AUTH') return go('login');
+    if (r.code === 'MUST_CHANGE') return go('change-pw');
+    show('quiz');
+    return;
+  }
+  openResult({ diagnosisId: r.diagnosisId, type: r.type, createdAt: r.createdAt, result: r.result });
+}
+
+function openResult(d) {
+  state.report = d;
+  if (d.type === '簡易') { renderQuick(d); show('quick-result'); animateGauges($('#quick-body')); }
+  else { renderReport(d); show('report'); animateGauges($('#report-body')); }
+}
+
+/* ---------- 結果表示 ---------- */
+function chips(list) {
+  return (list || []).filter(Boolean).map((t) => `<span class="inline-block rounded-full bg-brand/10 text-brand font-bold text-sm px-3 py-1 mr-2 mb-2">${esc(t)}</span>`).join('');
+}
+function ul(list, cls = '') {
+  return `<ul class="mt-3 space-y-2 ${cls}">` + (list || []).map((t) => `<li class="flex gap-2 leading-relaxed"><span class="mt-2.5 shrink-0 w-1.5 h-1.5 rounded-full bg-brand"></span><span>${esc(t)}</span></li>`).join('') + `</ul>`;
+}
+function head(d, r) {
+  return `<p class="text-sm text-muted">${esc(TYPE_LABEL[d.type] || d.type)}　${fmtDate(d.createdAt)}</p>
+    <div class="mt-4 bg-white border border-line rounded-2xl p-6 grid md:grid-cols-[minmax(0,1fr)_1.3fr] gap-6 items-center">
+      <div>${gauge(r.score, r.level)}</div>
+      <div>
+        <p class="text-sm text-muted">あなたのAI活用レベル</p>
+        <p class="mt-1"><span class="text-5xl font-black">${esc(r.level)}</span><span class="ml-3 text-2xl font-bold text-muted">${esc(r.score)}<span class="text-base">点</span></span></p>
+        <p class="mt-4 leading-relaxed">${esc(r.summary)}</p>
+      </div>
+    </div>`;
+}
+
+function renderQuick(d) {
+  const r = d.result, f = r.firstStep || {};
+  const loggedIn = state.user && !state.user.mustChangePassword;
+  $('#quick-body').innerHTML = head(d, r) + `
+    <div class="mt-6 bg-white border-2 border-brand rounded-2xl p-6">
+      <p class="text-sm font-bold text-brand">最初の一歩</p>
+      <h2 class="mt-1 text-xl md:text-2xl font-bold">${esc(f.title)}</h2>
+      <p class="mt-3 leading-relaxed whitespace-pre-wrap">${esc(f.description)}</p>
+      ${f.tools && f.tools.length ? `<div class="mt-4">${chips(f.tools)}</div>` : ''}
+    </div>
+    ${r.tips && r.tips.length ? `<div class="mt-6"><h2 class="text-lg font-bold">続けるためのヒント</h2>${ul(r.tips)}</div>` : ''}
+    <div class="no-print mt-10 rounded-2xl bg-ink text-white p-6 md:p-8">
+      <h2 class="text-xl md:text-2xl font-bold">詳しい診断とロードマップを受け取る</h2>
+      <p class="mt-3 text-white/80 leading-relaxed">本診断では、効果と費用の見込み、あなたに合うAIツール、導入の手順、セキュリティの注意点までレポートにまとめます。会員登録は無料です。</p>
+      <div class="mt-5 flex flex-col sm:flex-row gap-3">
+        ${loggedIn
+          ? `<button data-go="dash" class="bg-amber text-ink font-bold rounded-lg px-6 py-3">本診断に進む</button>`
+          : `<button data-go="register" class="bg-amber text-ink font-bold rounded-lg px-6 py-3">無料会員登録へ</button>
+             <button data-action="start-full" class="border border-white/40 font-bold rounded-lg px-6 py-3">登録済みの方はログイン</button>`}
+        <button data-action="start-quick" class="border border-white/40 font-bold rounded-lg px-6 py-3">もう一度診断する</button>
+      </div>
+    </div>`;
+}
+
+function renderReport(d) {
+  const r = d.result, roi = r.roi || {};
+  const stat = (label, v) => `<div class="bg-paper rounded-xl p-4"><p class="text-xs text-muted">${label}</p><p class="mt-1 font-bold text-lg leading-snug">${esc(v || '—')}</p></div>`;
+  $('#report-body').innerHTML = head(d, r) + `
+    <div class="mt-6 grid md:grid-cols-2 gap-4">
+      <div class="bg-white border border-line rounded-2xl p-6"><h2 class="text-lg font-bold">強み</h2>${ul(r.strengths)}</div>
+      <div class="bg-white border border-line rounded-2xl p-6"><h2 class="text-lg font-bold">課題</h2>${ul(r.challenges)}</div>
+    </div>
+
+    <section class="mt-6 bg-white border border-line rounded-2xl p-6">
+      <h2 class="text-xl font-bold">効果と費用の見込み</h2>
+      <p class="mt-3 leading-relaxed">${esc(roi.headline)}</p>
+      <div class="mt-4 grid sm:grid-cols-3 gap-3">${stat('削減できる時間', roi.timeSaved)}${stat('月額費用', roi.monthlyCost)}${stat('費用回収', roi.payback)}</div>
+      ${roi.assumptions && roi.assumptions.length ? `<details class="mt-4 text-sm text-muted"><summary class="cursor-pointer font-bold">試算の前提</summary>${ul(roi.assumptions, 'text-sm')}</details>` : ''}
+    </section>
+
+    <section class="mt-6">
+      <h2 class="text-xl font-bold">推奨AIツール</h2>
+      <div class="mt-3 bg-white border border-line rounded-2xl divide-y divide-line">
+        ${(r.recommendedTools || []).map((t) => `
+          <div class="p-5 md:grid md:grid-cols-[180px_1fr] gap-4">
+            <div><p class="font-bold text-lg">${esc(t.name)}</p><p class="text-sm text-muted">${esc(t.category)}</p></div>
+            <div><p class="leading-relaxed">${esc(t.purpose)}</p><p class="mt-1 text-sm text-muted">料金の目安：${esc(t.price)}</p></div>
+          </div>`).join('')}
+      </div>
+    </section>
+
+    <section class="mt-6">
+      <h2 class="text-xl font-bold">導入ステップ</h2>
+      <ol class="mt-4 relative border-l-2 border-line ml-4">
+        ${(r.roadmap || []).map((p, i) => `
+          <li class="ml-8 pb-8 last:pb-0 relative">
+            <span class="absolute -left-[3.2rem] top-0 w-9 h-9 rounded-full bg-brand text-white font-bold flex items-center justify-center">${i + 1}</span>
+            <p class="font-bold text-lg">${esc(p.phase)}<span class="ml-2 text-sm font-normal text-muted">${esc(p.period)}</span></p>
+            <p class="mt-1 text-muted">ゴール：${esc(p.goal)}</p>
+            ${ul(p.actions)}
+          </li>`).join('')}
+      </ol>
+    </section>
+
+    <section class="mt-6 bg-white border border-line rounded-2xl p-6">
+      <h2 class="text-xl font-bold">セキュリティの留意点</h2>
+      <div class="mt-3 divide-y divide-line">
+        ${(r.security || []).map((x) => `<div class="py-3"><p class="font-bold">${esc(x.risk)}</p><p class="mt-1 leading-relaxed text-muted">${esc(x.measure)}</p></div>`).join('')}
+      </div>
+    </section>
+
+    <section class="mt-6 bg-white border-2 border-amber rounded-2xl p-6">
+      <h2 class="text-xl font-bold">今週やること</h2>
+      <div class="mt-3 space-y-2">
+        ${(r.nextActions || []).map((t) => `<label class="flex gap-3 items-start cursor-pointer leading-relaxed"><input type="checkbox" class="mt-1.5 w-5 h-5 accent-[#2F5BEA]"><span>${esc(t)}</span></label>`).join('')}
+      </div>
+    </section>`;
+}
+
+/* ---------- マイページ ---------- */
+async function loadDash() {
+  const u = state.user;
+  $('#dash-hello').textContent = `${u.attribute === '法人' && u.companyName ? u.companyName + '　' : ''}${u.name} さん`;
+  document.querySelectorAll('#size-buttons [data-full]').forEach((b) => {
+    const mine = u.attribute === '法人' && b.dataset.full === '法人_' + u.companySize;
+    b.classList.toggle('border-brand', mine);
+    b.classList.toggle('bg-brand/5', mine);
+  });
+  const box = $('#history');
+  box.innerHTML = `<p class="p-5 text-muted">読み込んでいます…</p>`;
+  const r = await api('history');
+  if (!r.ok) { box.innerHTML = `<p class="p-5 text-red-600">${esc(r.error)}</p>`; if (r.code === 'AUTH') go('login'); return; }
+  if (!r.history.length) { box.innerHTML = `<p class="p-5 text-muted">まだ診断していません。上の診断から始めてください。</p>`; return; }
+  box.innerHTML = r.history.map((h) => `
+    <button data-open="${esc(h.diagnosisId)}" class="w-full text-left p-4 md:p-5 flex items-center justify-between gap-3 hover:bg-paper">
+      <span><span class="font-bold">${esc(TYPE_LABEL[h.type] || h.type)}</span><span class="block text-sm text-muted">${fmtDate(h.createdAt)}</span></span>
+      <span class="shrink-0 text-right"><span class="font-black text-lg">${esc(h.level)}</span><span class="ml-1 text-sm text-muted">${esc(h.score)}点</span></span>
+    </button>`).join('');
+}
+
+async function openHistory(id, btn) {
+  busy(btn, true, '読み込み中…');
+  const r = await api('getDiagnosis', { diagnosisId: id });
+  busy(btn, false);
+  if (!r.ok) return toast(r.error, 'error');
+  openResult({ diagnosisId: r.diagnosisId, type: r.type, createdAt: r.createdAt, result: r.result });
+}
+
+/* ---------- 認証フォーム ---------- */
+function prepareChangePw() {
+  const initial = state.user && state.user.mustChangePassword;
+  $('#change-note').textContent = initial ? '仮パスワードでログインしました。続けるには新しいパスワードを設定してください。' : '';
+  $('#cur-label').textContent = initial ? '仮パスワード（メールに記載）' : '現在のパスワード';
+  $('#change-cancel').hidden = !!initial;
+  $('#form-change').reset();
+}
+
+$('#form-login').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target, btn = f.querySelector('button:not([type])');
+  busy(btn, true, 'ログイン中…');
+  const r = await api('login', { email: f.email.value, password: f.password.value });
+  busy(btn, false);
+  if (!r.ok) return toast(r.error, 'error');
+  saveSession(r.token, r.user);
+  f.reset();
+  go(r.user.mustChangePassword ? 'change-pw' : (state.afterLogin || 'dash'));
+});
+
+$('#form-register').addEventListener('change', (e) => {
+  if (e.target.name === 'attribute') $('#corp-fields').hidden = e.target.value !== '法人';
+});
+$('#form-register').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target, btn = f.querySelector('button:not([type])');
+  const data = { attribute: f.attribute.value, name: f.elements['name'].value, email: f.email.value, companyName: f.companyName.value, companySize: f.companySize.value };
+  busy(btn, true, '送信中…');
+  const r = await api('register', data);
+  busy(btn, false);
+  if (!r.ok) return toast(r.error, 'error');
+  toast(r.message);
+  $('#form-login').email.value = data.email;
+  f.reset(); $('#corp-fields').hidden = true;
+  state.afterLogin = 'dash';
+  go('login');
+  $('#login-note').textContent = '届いたメールの仮パスワードでログインしてください。';
+});
+
+$('#form-forgot').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target, btn = f.querySelector('button:not([type])');
+  busy(btn, true, '送信中…');
+  const r = await api('forgotPassword', { email: f.email.value });
+  busy(btn, false);
+  if (!r.ok) return toast(r.error, 'error');
+  toast(r.message);
+  $('#form-login').email.value = f.email.value;
+  f.reset();
+  go('login');
+});
+
+$('#form-change').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const f = e.target, btn = f.querySelector('button:not([type])');
+  if (f.newPassword.value !== f.confirmPassword.value) return toast('確認用のパスワードが一致しません', 'error');
+  if (!/^(?=.*[A-Za-z])(?=.*\d).{8,64}$/.test(f.newPassword.value)) return toast('新しいパスワードは8文字以上で、英字と数字を両方含めてください', 'error');
+  busy(btn, true, '設定中…');
+  const r = await api('changePassword', { currentPassword: f.currentPassword.value, newPassword: f.newPassword.value });
+  busy(btn, false);
+  if (!r.ok) { toast(r.error, 'error'); if (r.code === 'AUTH') go('login'); return; }
+  state.user = r.user;
+  toast(r.message);
+  go('dash');
+});
+
+/* ---------- パスワード表示切替 ---------- */
+const EYE = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const EYE_OFF = '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 19c-7 0-11-7-11-7a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 7 11 7a18.5 18.5 0 0 1-2.16 3.19"/><path d="M14.12 14.12a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+document.querySelectorAll('.pw-eye').forEach((b) => { b.innerHTML = EYE; b.setAttribute('aria-label', 'パスワードを表示'); });
+
+/* ---------- クリック操作 ---------- */
+document.addEventListener('click', async (e) => {
+  const eye = e.target.closest('.pw-eye');
+  if (eye) {
+    const input = eye.parentElement.querySelector('input');
+    const reveal = input.type === 'password';
+    input.type = reveal ? 'text' : 'password';
+    eye.innerHTML = reveal ? EYE_OFF : EYE;
+    eye.setAttribute('aria-label', reveal ? 'パスワードを隠す' : 'パスワードを表示');
+    return;
+  }
+  const goBtn = e.target.closest('[data-go]');
+  if (goBtn) { if (goBtn.dataset.go === 'login') state.afterLogin = 'dash'; return go(goBtn.dataset.go); }
+
+  const full = e.target.closest('[data-full]');
+  if (full) return startQuiz(full.dataset.full);
+
+  const open = e.target.closest('[data-open]');
+  if (open) return openHistory(open.dataset.open, open);
+
+  const act = e.target.closest('[data-action]');
+  if (!act) return;
+  switch (act.dataset.action) {
+    case 'start-quick': return startQuiz('簡易');
+    case 'start-full':
+      if (state.user) return go('dash');
+      state.afterLogin = 'dash';
+      return go('login');
+    case 'logout':
+      await api('logout');
+      clearSession();
+      toast('ログアウトしました');
+      return show('home');
+  }
+});
+
+document.addEventListener('change', (e) => {
+  if (e.target.name !== 'opt') return;
+  document.querySelectorAll('input[name="opt"]').forEach(syncMark);
+});
+
+$('#logo').addEventListener('click', () => (state.user && !state.user.mustChangePassword ? go('dash') : show('home')));
+
+$('#quiz-back').addEventListener('click', () => {
+  const qz = state.quiz;
+  if (qz.idx === 0) return qz.type === '簡易' ? show('home') : go('dash');
+  if (qz.qs[qz.idx].type === 'text') qz.answers[qz.qs[qz.idx].id] = $('#q-text').value.trim();
+  qz.idx--; renderQuestion();
+});
+$('#quiz-next').addEventListener('click', () => {
+  if (!collectAnswer()) return;
+  const qz = state.quiz;
+  if (qz.idx < qz.qs.length - 1) { qz.idx++; renderQuestion(); window.scrollTo(0, 0); }
+  else submitQuiz();
+});
+
+$('#btn-email-report').addEventListener('click', async (e) => {
+  if (!state.report) return;
+  const btn = e.currentTarget;
+  busy(btn, true, 'PDFを作成中…');
+  const r = await api('emailReport', { diagnosisId: state.report.diagnosisId });
+  busy(btn, false);
+  toast(r.ok ? r.message : r.error, r.ok ? 'info' : 'error');
+});
+
+/* ---------- 起動 ---------- */
+(async function init() {
+  $('#hero-gauge').innerHTML = gauge(62, '中級');
+  show('home');
+  animateGauges($('#hero-gauge'));
+  if (!GAS_URL || GAS_URL.includes('XXXX')) toast('config.js の GAS_URL を設定してください', 'error');
+  if (!state.token) return;
+  const r = await api('me');
+  if (!r.ok) return;
+  state.user = r.user;
+  go(r.user.mustChangePassword ? 'change-pw' : 'dash');
+})();
+</script>
+</body>
+</html>
