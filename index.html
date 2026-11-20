@@ -236,7 +236,26 @@
   </section>
 </main>
 
-<footer class="text-center text-xs text-muted py-6">診断結果はAIによる目安です。料金や機能は導入前に各サービスの最新情報をご確認ください。</footer>
+<footer class="no-print text-center text-xs text-muted py-6 px-4">
+  <button type="button" data-action="model-open" class="mb-3 inline-flex items-center gap-2 rounded-full border border-line bg-white px-4 py-2 text-sm font-bold text-ink hover:border-brand">
+    <span class="text-muted font-normal">AIモデル：</span><span id="model-current">自動モード</span><span aria-hidden="true">▾</span>
+  </button>
+  <p>診断結果はAIによる目安です。料金や機能は導入前に各サービスの最新情報をご確認ください。</p>
+</footer>
+
+<!-- AIモデル選択シート -->
+<div id="model-sheet" class="fixed inset-0 z-40 bg-black/40 p-4 overflow-y-auto" hidden>
+  <div id="model-backdrop" class="min-h-full flex items-center justify-center">
+  <div class="w-full max-w-md rounded-3xl bg-white shadow-xl overflow-hidden" role="dialog" aria-modal="true" aria-labelledby="model-title">
+    <div class="px-6 pt-5 pb-2 flex items-center justify-between">
+      <h2 id="model-title" class="text-lg font-bold">使用するAIモデル</h2>
+      <button type="button" data-action="model-close" class="text-2xl leading-none text-muted px-2" aria-label="閉じる">×</button>
+    </div>
+    <div id="model-list" class="divide-y divide-line"></div>
+    <p class="px-6 py-4 text-xs text-muted leading-relaxed bg-paper">選んだモデルが使えない時は、汎用の最新モデルに自動で切り替わります。</p>
+  </div>
+  </div>
+</div>
 
 <div id="toast" class="fixed left-1/2 -translate-x-1/2 bottom-6 z-50 max-w-[92vw] px-5 py-3 rounded-lg text-white font-bold shadow-lg" role="status" aria-live="polite" hidden></div>
 
@@ -246,6 +265,40 @@
 const GAS_URL = (window.APP_CONFIG && window.APP_CONFIG.GAS_URL) || '';
 
 const TOKEN_KEY = 'aiShindanToken';
+
+/* ---------- AIモデル（GAS側 GEMINI_MODELS とキーを合わせる） ---------- */
+const MODEL_KEY = 'aiShindanModel';
+const AI_MODELS = [
+  { key: 'auto',     label: '自動モード（汎用の最新）' },
+  { key: 'hydrogen', label: '4 Hydrogen（日々の暮らしをサポート）' },
+  { key: 'neon',     label: '4 Neon（Deeper analysis）' },
+  { key: 'carbon',   label: '4 Carbon（Code & complex work）' },
+  { key: 'argon',    label: '4 Argon' },
+  { key: 'flash38',  label: '3.8 Flash' },
+  { key: 'flash35',  label: '3.5 Flash' }
+];
+function getModel() {
+  const k = localStorage.getItem(MODEL_KEY);
+  return AI_MODELS.some((m) => m.key === k) ? k : 'auto';
+}
+function setModel(k) {
+  localStorage.setItem(MODEL_KEY, k);
+  renderModelCurrent();
+}
+function renderModelCurrent() {
+  const m = AI_MODELS.find((x) => x.key === getModel());
+  $('#model-current').textContent = m.key === 'auto' ? '自動モード' : 'Gemini ' + m.label.replace(/（.*$/, '');
+}
+function openModelSheet() {
+  const cur = getModel();
+  $('#model-list').innerHTML = AI_MODELS.map((m) => `
+    <label class="flex items-center justify-between gap-4 px-6 py-4 cursor-pointer hover:bg-paper">
+      <span class="text-lg leading-snug">${esc(m.label)}</span>
+      <input type="radio" name="ai-model" value="${m.key}" ${m.key === cur ? 'checked' : ''} class="shrink-0 w-6 h-6 accent-[#2F5BEA]">
+    </label>`).join('');
+  $('#model-sheet').hidden = false;
+}
+function closeModelSheet() { $('#model-sheet').hidden = true; }
 const state = { token: localStorage.getItem(TOKEN_KEY) || '', user: null, quiz: null, report: null, afterLogin: 'dash' };
 
 const TYPE_LABEL = {
@@ -463,7 +516,7 @@ async function submitQuiz() {
   });
   $('#loading-sub').textContent = type === '簡易' ? '10〜20秒ほどかかります。' : '30秒ほどかかります。画面を閉じずにお待ちください。';
   show('loading');
-  const r = await api(type === '簡易' ? 'quickDiagnose' : 'fullDiagnose', { type, answers: payload });
+  const r = await api(type === '簡易' ? 'quickDiagnose' : 'fullDiagnose', { type, answers: payload, model: getModel() });
   if (!r.ok) {
     toast(r.error, 'error');
     if (r.code === 'AUTH') return go('login');
@@ -472,6 +525,7 @@ async function submitQuiz() {
     return;
   }
   openResult({ diagnosisId: r.diagnosisId, type: r.type, createdAt: r.createdAt, result: r.result });
+  if (r.modelFallback) toast(`選んだモデルが使えなかったため、${r.model} で診断しました`);
 }
 
 function openResult(d) {
@@ -488,7 +542,7 @@ function ul(list, cls = '') {
   return `<ul class="mt-3 space-y-2 ${cls}">` + (list || []).map((t) => `<li class="flex gap-2 leading-relaxed"><span class="mt-2.5 shrink-0 w-1.5 h-1.5 rounded-full bg-brand"></span><span>${esc(t)}</span></li>`).join('') + `</ul>`;
 }
 function head(d, r) {
-  return `<p class="text-sm text-muted">${esc(TYPE_LABEL[d.type] || d.type)}　${fmtDate(d.createdAt)}</p>
+  return `<p class="text-sm text-muted">${esc(TYPE_LABEL[d.type] || d.type)}　${fmtDate(d.createdAt)}${r.aiModel ? `　<span class="whitespace-nowrap">使用AI：${esc(r.aiModel)}</span>` : ''}</p>
     <div class="mt-4 bg-white border border-line rounded-2xl p-6 grid md:grid-cols-[minmax(0,1fr)_1.3fr] gap-6 items-center">
       <div>${gauge(r.score, r.level)}</div>
       <div>
@@ -703,6 +757,8 @@ document.addEventListener('click', async (e) => {
   if (!act) return;
   switch (act.dataset.action) {
     case 'start-quick': return startQuiz('簡易');
+    case 'model-open': return openModelSheet();
+    case 'model-close': return closeModelSheet();
     case 'start-full':
       if (state.user) return go('dash');
       state.afterLogin = 'dash';
@@ -744,9 +800,20 @@ $('#btn-email-report').addEventListener('click', async (e) => {
   toast(r.ok ? r.message : r.error, r.ok ? 'info' : 'error');
 });
 
+/* ---------- AIモデル選択 ---------- */
+$('#model-sheet').addEventListener('change', (e) => {
+  if (e.target.name !== 'ai-model') return;
+  setModel(e.target.value);
+  setTimeout(closeModelSheet, 150);
+  toast(`AIモデルを「${$('#model-current').textContent}」にしました`);
+});
+$('#model-sheet').addEventListener('click', (e) => { if (e.target.id === 'model-sheet' || e.target.id === 'model-backdrop') closeModelSheet(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#model-sheet').hidden) closeModelSheet(); });
+
 /* ---------- 起動 ---------- */
 (async function init() {
   $('#hero-gauge').innerHTML = gauge(62, '中級');
+  renderModelCurrent();
   show('home');
   animateGauges($('#hero-gauge'));
   if (!GAS_URL || GAS_URL.includes('XXXX')) toast('config.js の GAS_URL を設定してください', 'error');

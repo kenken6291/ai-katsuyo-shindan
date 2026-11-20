@@ -4,7 +4,7 @@
  *
  * スクリプトプロパティ（プロジェクトの設定 → スクリプト プロパティ）
  *   GEMINI_API_KEY    : 必須  Gemini APIキー
- *   GEMINI_MODEL      : 任意  既定 gemini-2.5-flash
+ *   GEMINI_MODEL      : 任意  自動モードで最初に試すモデルID（未設定なら下の GEMINI_AUTO_CHAIN の順）
  *   APP_URL           : 任意  GitHub PagesのURL（メール本文に記載）
  *   SPREADSHEET_ID    : 任意  スタンドアロンGASの場合のみ必須（コンテナバインドなら不要）
  *   DRIVE_FOLDER_ID   : 自動  setup() 実行時に作成
@@ -35,6 +35,21 @@ const TYPE_LABEL = {
   '法人_大規模': '法人向け診断（大規模：101名以上）'
 };
 
+/* ---------- Geminiモデル ----------
+ * 画面で選んだキー → モデルID。選んだモデルが使えない時は AUTO の順に自動で切り替える。
+ * 新しいモデルが出たら、ここと index.html の AI_MODELS に1行足すだけでOK。
+ */
+const GEMINI_MODELS = {
+  auto:     { id: '',                 label: '自動モード（汎用の最新）' },
+  hydrogen: { id: 'gemini-4-hydrogen', label: 'Gemini 4 Hydrogen' },
+  neon:     { id: 'gemini-4-neon',     label: 'Gemini 4 Neon' },
+  carbon:   { id: 'gemini-4-carbon',   label: 'Gemini 4 Carbon' },
+  argon:    { id: 'gemini-4-argon',    label: 'Gemini 4 Argon' },
+  flash38:  { id: 'gemini-3.8-flash',  label: 'Gemini 3.8 Flash' },
+  flash35:  { id: 'gemini-3.5-flash',  label: 'Gemini 3.5 Flash' }
+};
+const GEMINI_AUTO_CHAIN = ['gemini-4-hydrogen', 'gemini-3.8-flash', 'gemini-3.5-flash', 'gemini-2.5-flash'];
+
 const ROUTES = {
   register: register_,
   login: login_,
@@ -46,7 +61,8 @@ const ROUTES = {
   fullDiagnose: fullDiagnose_,
   history: history_,
   getDiagnosis: getDiagnosis_,
-  emailReport: emailReport_
+  emailReport: emailReport_,
+  models: models_
 };
 
 /* =========================================================
@@ -106,6 +122,24 @@ function cleanupSessions() {
 /** Gemini接続テスト（任意） */
 function testGemini() {
   Logger.log(JSON.stringify(callGemini_('JSONで返答してください。', '{"ok":true} をそのまま返してください。')));
+}
+
+/** 全モデルの接続テスト（任意）：どのモデルが使えるかログに出す */
+function testAllModels() {
+  const key = prop_('GEMINI_API_KEY');
+  Object.keys(GEMINI_MODELS).forEach(function (k) {
+    const id = GEMINI_MODELS[k].id;
+    if (!id) return;
+    const r = requestGemini_(key, id, 'JSONで返答してください。', '{"ok":true} をそのまま返してください。');
+    Logger.log(k + ' (' + id + '): ' + (r.ok ? 'OK' : 'NG ' + r.code));
+  });
+}
+
+/** 画面用モデル一覧 */
+function models_() {
+  return {
+    models: Object.keys(GEMINI_MODELS).map(function (k) { return { key: k, id: GEMINI_MODELS[k].id, label: GEMINI_MODELS[k].label }; })
+  };
 }
 
 /* =========================================================
@@ -232,9 +266,11 @@ function quickDiagnose_(req) {
     try { userId = auth_(req, true).id; } catch (e) { userId = 'guest'; }
   }
   if (userId === 'guest') checkGuestQuota_();
-  const result = normalizeQuick_(callGemini_(SYSTEM_PROMPT, buildQuickPrompt_(answers)));
+  const ai = callGemini_(SYSTEM_PROMPT, buildQuickPrompt_(answers), req.model);
+  const result = normalizeQuick_(ai.json);
+  result.aiModel = ai.label;
   const id = saveDiagnosis_(userId, '簡易', answers, result);
-  return { diagnosisId: id, type: '簡易', createdAt: nowIso_(), result: result };
+  return { diagnosisId: id, type: '簡易', createdAt: nowIso_(), result: result, model: ai.label, modelFallback: ai.fallback };
 }
 
 function fullDiagnose_(req) {
@@ -242,9 +278,11 @@ function fullDiagnose_(req) {
   const type = String(req.type || '');
   if (FULL_TYPES.indexOf(type) < 0) throw err_('BAD', '診断タイプが正しくありません');
   const answers = cleanAnswers_(req.answers);
-  const result = normalizeFull_(callGemini_(SYSTEM_PROMPT, buildFullPrompt_(type, answers, u)));
+  const ai = callGemini_(SYSTEM_PROMPT, buildFullPrompt_(type, answers, u), req.model);
+  const result = normalizeFull_(ai.json);
+  result.aiModel = ai.label;
   const id = saveDiagnosis_(u.id, type, answers, result);
-  return { diagnosisId: id, type: type, createdAt: nowIso_(), result: result };
+  return { diagnosisId: id, type: type, createdAt: nowIso_(), result: result, model: ai.label, modelFallback: ai.fallback };
 }
 
 function history_(req) {
@@ -402,43 +440,95 @@ function buildFullPrompt_(type, answers, u) {
 /* =========================================================
  * Gemini API 呼び出し
  * ======================================================= */
-function callGemini_(system, prompt) {
+/**
+ * modelKey : 画面で選んだキー（auto / hydrogen / neon / carbon / argon / flash38 / flash35）
+ * 戻り値   : { json, model, label, fallback }
+ * 選んだモデルが使えない（未提供・404・混雑で失敗など）時は、自動モードの順に切り替える。
+ */
+function callGemini_(system, prompt, modelKey) {
   const key = prop_('GEMINI_API_KEY');
   if (!key) throw err_('CONFIG', 'サーバー設定エラー: GEMINI_API_KEY が未設定です');
-  const model = prop_('GEMINI_MODEL', 'gemini-2.5-flash');
+
+  const sel = GEMINI_MODELS[modelKey] ? modelKey : 'auto';
+  const wanted = GEMINI_MODELS[sel].id;
+  const chain = [];
+  const add = function (m) { if (m && chain.indexOf(m) < 0) chain.push(m); };
+  add(wanted);
+  add(prop_('GEMINI_MODEL'));
+  GEMINI_AUTO_CHAIN.forEach(add);
+
+  let last = null;
+  for (let m = 0; m < chain.length; m++) {
+    const model = chain[m];
+    const r = requestGemini_(key, model, system, prompt);
+    if (r.ok) {
+      return {
+        json: parseJson_(r.text),
+        model: model,
+        label: labelOf_(model),
+        fallback: sel !== 'auto' && model !== wanted
+      };
+    }
+    last = r;
+    console.warn('Gemini model failed → next', model, r.code, r.body);
+  }
+  throw err_('AI', last && last.code === 429
+    ? 'AIが混み合っています。少し時間をおいて再度お試しください'
+    : 'AI診断の作成に失敗しました（エラー ' + (last ? last.code : '?') + '）');
+}
+
+function labelOf_(model) {
+  const k = Object.keys(GEMINI_MODELS).find(function (x) { return GEMINI_MODELS[x].id === model; });
+  return k ? GEMINI_MODELS[k].label : model;
+}
+
+/** 1モデルへのリクエスト（混雑・一時エラーは同じモデルで2回まで再試行） */
+function requestGemini_(key, model, system, prompt) {
   const url = 'https://generativelanguage.googleapis.com/v1beta/models/' + encodeURIComponent(model) + ':generateContent';
   const payload = {
     systemInstruction: { parts: [{ text: system }] },
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: { temperature: 0.6, responseMimeType: 'application/json', maxOutputTokens: 16384 }
+    generationConfig: { temperature: 0.6, responseMimeType: 'application/json', maxOutputTokens: 32768 }
   };
-
+  let code = 0, body = '';
   for (let i = 0; i < 3; i++) {
-    const res = UrlFetchApp.fetch(url, {
-      method: 'post',
-      contentType: 'application/json',
-      headers: { 'x-goog-api-key': key },
-      payload: JSON.stringify(payload),
-      muteHttpExceptions: true
-    });
-    const code = res.getResponseCode();
-    if (code === 200) {
-      const data = JSON.parse(res.getContentText());
-      const cand = (data.candidates || [])[0] || {};
-      const parts = (cand.content && cand.content.parts) || [];
-      const text = parts.filter(function (p) { return !p.thought; }).map(function (p) { return p.text || ''; }).join('');
-      if (!text) throw err_('AI', 'AIから回答が得られませんでした。もう一度お試しください');
-      return parseJson_(text);
+    let res;
+    try {
+      res = UrlFetchApp.fetch(url, {
+        method: 'post',
+        contentType: 'application/json',
+        headers: { 'x-goog-api-key': key },
+        payload: JSON.stringify(payload),
+        muteHttpExceptions: true
+      });
+    } catch (ex) {
+      code = 0; body = String(ex);
+      if (i < 2) { Utilities.sleep(1500 * (i + 1)); continue; }
+      break;
     }
-    if ([429, 500, 503].indexOf(code) >= 0 && i < 2) {
+    code = res.getResponseCode();
+    body = res.getContentText();
+    if (code === 200) {
+      try {
+        const data = JSON.parse(body);
+        const cand = (data.candidates || [])[0] || {};
+        const parts = (cand.content && cand.content.parts) || [];
+        const text = parts.filter(function (p) { return !p.thought; }).map(function (p) { return p.text || ''; }).join('');
+        if (text) return { ok: true, text: text };
+        code = 'EMPTY';
+      } catch (ex) {
+        code = 'PARSE';
+      }
+      break; // 空回答は別モデルで試す
+    }
+    // 404/400/403 = そのモデルが使えない → すぐ次のモデルへ
+    if ([429, 500, 502, 503, 504].indexOf(code) >= 0 && i < 2) {
       Utilities.sleep(2000 * (i + 1));
       continue;
     }
-    console.error('Gemini error', code, res.getContentText());
-    throw err_('AI', code === 429
-      ? 'AIが混み合っています。少し時間をおいて再度お試しください'
-      : 'AI診断の作成に失敗しました（エラー ' + code + '）');
+    break;
   }
+  return { ok: false, code: code, body: String(body).slice(0, 500) };
 }
 
 function parseJson_(text) {

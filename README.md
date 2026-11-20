@@ -71,7 +71,8 @@ forgotPassword ─ 新しい仮パスワード送信（旧PW無効・全セッ�
 3. 「プロジェクトの設定 → スクリプト プロパティ」に追加
    - `GEMINI_API_KEY` … Google AI Studio で発行したキー（必須）
    - `APP_URL` … 例 `https://kenken6291.github.io/ai-katsuyo-shindan/`（メール本文用）
-   - `GEMINI_MODEL` … 変更したいときのみ（既定 `gemini-2.5-flash`）
+   - `GEMINI_MODEL` … 任意。自動モードで最初に試すモデルID（未設定なら Gemini 4 Hydrogen → 3.8 Flash → 3.5 Flash → 2.5 Flash の順）
+   - 画面下の「AIモデル」から利用者がモデルを選べます。選んだモデルが使えない時は自動モードの順に切り替わります。GASエディタで `testAllModels` を実行すると各モデルが使えるか確認できます
 4. エディタで関数 `setup` を選んで実行 → 権限を承認（シート作成・PEPPER生成・Driveフォルダ作成）
 5. 任意：`testGemini` を実行して Gemini 接続を確認
 6. 「デプロイ → 新しいデプロイ → ウェブアプリ」
